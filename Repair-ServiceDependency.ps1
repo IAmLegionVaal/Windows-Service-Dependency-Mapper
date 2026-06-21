@@ -1,0 +1,7 @@
+[CmdletBinding(SupportsShouldProcess=$true)]
+param([Parameter(Mandatory)][string]$ServiceName,[switch]$StartDependencies,[switch]$RestartService,[switch]$SetAutomatic,[string]$OutputPath="$env:USERPROFILE\Desktop\ServiceDependencyRepair")
+$ErrorActionPreference='Stop';New-Item -ItemType Directory -Path $OutputPath -Force|Out-Null;$Log=Join-Path $OutputPath ("repair-{0:yyyyMMdd-HHmmss}.log"-f(Get-Date));function L($m){"$(Get-Date -Format s) $m"|Tee-Object -FilePath $Log -Append};if(-not($StartDependencies-or$RestartService-or$SetAutomatic)){throw'Choose at least one repair action.'};$svc=Get-Service $ServiceName -ErrorAction Stop;$svc|Select Name,Status,StartType,ServicesDependedOn,DependentServices|Export-Clixml (Join-Path $OutputPath 'before.xml')
+if($StartDependencies){foreach($d in $svc.ServicesDependedOn){if($d.Status-ne'Running'-and$PSCmdlet.ShouldProcess($d.Name,'Start dependency')){Start-Service $d.Name;L"Started dependency $($d.Name)"}}}
+if($SetAutomatic-and$PSCmdlet.ShouldProcess($svc.Name,'Set startup Automatic')){Set-Service $svc.Name -StartupType Automatic;L'Startup type set.'}
+if($RestartService-and$PSCmdlet.ShouldProcess($svc.Name,'Restart service')){Restart-Service $svc.Name -Force;L'Service restarted.'}
+Start-Sleep 2;Get-Service $ServiceName|Select Name,Status,StartType|Export-Clixml (Join-Path $OutputPath 'after.xml');L'Repair workflow finished.'
